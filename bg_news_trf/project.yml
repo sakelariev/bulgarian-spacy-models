@@ -1,0 +1,114 @@
+title: "Bulgarian Part-of-speech Tagging & Dependency Parsing using Universal Dependencies"
+
+# Variables can be referenced across the project.yml using ${vars.var_name}
+vars:
+  config: "config"
+  lang: "bg"
+  treebank: "UD_Bulgarian-BTB"
+  train_name: "bg_btb-ud-train"
+  dev_name: "bg_btb-ud-dev"
+  test_name: "bg_btb-ud-test"
+  package_name: "news_trf"
+  package_version: "3.5.4"
+  gpu: 0
+
+spacy_version: ">=3.3.0,<4.0.0"
+
+# These are the directories that the project needs. The project CLI will make
+# sure that they always exist.
+directories: ["assets", "corpus", "training", "metrics", "configs", "packages"]
+
+assets:
+  - dest: "assets/${vars.treebank}"
+    git:
+      repo: "https://github.com/UniversalDependencies/${vars.treebank}"
+      branch: "master"
+      path: ""
+
+workflows:
+  all:
+    - preprocess
+    - train-trf
+    - evaluate
+    - package
+
+commands:
+  - name: preprocess
+    help: "Convert the data to spaCy's format"
+    script:
+      - "mkdir -p corpus/${vars.treebank}"
+      - >-
+        python -m spacy convert
+        assets/${vars.treebank}/${vars.train_name}.conllu 
+        corpus/${vars.treebank}/ 
+        --converter conllu 
+        --n-sents 10 
+        --merge-subtokens
+      - >-
+        python -m spacy convert 
+        assets/${vars.treebank}/${vars.dev_name}.conllu 
+        corpus/${vars.treebank}/ 
+        --converter conllu 
+        --n-sents 10 
+        --merge-subtokens
+      - >-
+        python -m spacy convert 
+        assets/${vars.treebank}/${vars.test_name}.conllu
+        corpus/${vars.treebank}/
+        --converter conllu 
+        --n-sents 10 
+        --merge-subtokens
+      - "mv corpus/${vars.treebank}/${vars.train_name}.spacy corpus/${vars.treebank}/train.spacy"
+      - "mv corpus/${vars.treebank}/${vars.dev_name}.spacy corpus/${vars.treebank}/dev.spacy"
+      - "mv corpus/${vars.treebank}/${vars.test_name}.spacy corpus/${vars.treebank}/test.spacy"
+    deps:
+      - "assets/${vars.treebank}/${vars.train_name}.conllu"
+      - "assets/${vars.treebank}/${vars.dev_name}.conllu"
+      - "assets/${vars.treebank}/${vars.test_name}.conllu"
+    outputs:
+      - "corpus/${vars.treebank}/train.spacy"
+      - "corpus/${vars.treebank}/dev.spacy"
+      - "corpus/${vars.treebank}/test.spacy"
+      
+  - name: "train"
+    help: "Train a transformers model"
+    script:
+      - "python -m spacy train configs/${vars.config-trf}.cfg --output training/${vars.treebank}-trf/ --gpu-id ${vars.gpu} --paths.train corpus/${vars.treebank}/train.spacy --paths.dev corpus/${vars.treebank}/dev.spacy --nlp.lang=${vars.lang}"
+    deps:
+      - "configs/${vars.config-trf}.cfg"
+      - "corpus/${vars.treebank}/train.spacy"
+      - "corpus/${vars.treebank}/dev.spacy"
+    outputs:
+      - "training/${vars.treebank}-trf/model-best"
+
+  - name: evaluate
+    help: "Evaluate on the test data and save the metrics"
+    script:
+      - "python -m spacy evaluate ./training/${vars.treebank}-trf/model-best ./corpus/${vars.treebank}/test.spacy --output ./metrics/${vars.treebank}-trf.json --gpu-id ${vars.gpu}"
+    deps:
+      - "training/${vars.treebank}-trf/model-best"
+      - "corpus/${vars.treebank}/test.spacy"
+    outputs:
+      - "metrics/${vars.treebank}-trf.json"
+
+  - name: package
+    help: "Package the trained model so it can be installed"
+    script:
+      - >-
+        python -m spacy package 
+        training/${vars.treebank}-trf/model-best packages
+        --build wheel  
+        --name ${vars.package_name}
+        --version ${vars.package_version}
+        --force
+    deps:
+      - "training/${vars.treebank}-trf/model-best"
+    outputs_no_cache:
+      - "packages/${vars.lang}_${vars.package_name}-${vars.package_version}/dist/${vars.package_name}-${vars.package_version}.tar.gz"
+
+  - name: clean
+    help: "Remove intermediate files"
+    script:
+      - "rm -rf training/*"
+      - "rm -rf metrics/*"
+      - "rm -rf corpus/*"

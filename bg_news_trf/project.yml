@@ -30,7 +30,9 @@ workflows:
     - preprocess
     - train-trf
     - evaluate
-    - package
+    - train-ner
+    - evaluate-ner
+    - assemble_package
 
 commands:
   - name: preprocess
@@ -91,20 +93,47 @@ commands:
     outputs:
       - "metrics/${vars.treebank}-trf.json"
 
-  - name: package
-    help: "Package the trained model so it can be installed"
+  - name: "train-ner"
+    help: "Train the NER model with Transformers model"
+    script:
+      - "python -m spacy train configs/config_ner.cfg --output training/ner_trf/ --paths.train corpus/train.spacy --paths.dev corpus/dev.spacy --gpu-id 0"
+    deps:
+      - "configs/config_ner.cfg"
+      - "corpus/train.spacy"
+      - "corpus/dev.spacy"
+    outputs:
+      - "training/ner_trf/model-best"
+  
+  - name: "evaluate-ner"
+    help: "Evaluate the model and export metrics"
+    script:
+     - "python -m spacy evaluate training/ner_trf/model-best corpus/dev.spacy --output training/ner_trf/metrics.json --gpu-id 0"
+    deps:
+     - "corpus/dev.spacy"
+     - "training/ner_trf/model-best"
+    outputs:
+     - "training/ner_trf/metrics.json"
+  
+  - name: "assemble_package"
+    help: "Assemble the bg_ner and bg_tagger_parser models and package them as a spaCy pipeline"
     script:
       - >-
-        python -m spacy package 
-        training/${vars.treebank}-trf/model-best packages
-        --build wheel  
+        python -m spacy assemble configs/assemble.cfg training/${vars.package_name}/model-best
+        --paths.parser_model training/${vars.package_name}/model-best
+        --paths.ner_model training/ner_trf/model-best
+        --verbose
+      - >-
+        python -m spacy package training/${vars.package_name}/model-best packages/
+        --build wheel
         --name ${vars.package_name}
         --version ${vars.package_version}
+        --meta-path meta.json
         --force
     deps:
-      - "training/${vars.treebank}-trf/model-best"
-    outputs_no_cache:
-      - "packages/${vars.lang}_${vars.package_name}-${vars.package_version}/dist/${vars.package_name}-${vars.package_version}.tar.gz"
+      - training/${vars.package_name}/model-best
+      - training/ner_trf/model-best
+    outputs:
+      - packages/bg_news_trf_${vars.package_version}
 
   - name: clean
     help: "Remove intermediate files"

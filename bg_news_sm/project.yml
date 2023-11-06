@@ -3,6 +3,8 @@ title: "Bulgarian Part-of-speech Tagging & Dependency Parsing using Universal De
 # Variables can be referenced across the project.yml using ${vars.var_name}
 vars:
   config: "config"
+  config_ner: "config_ner"
+  config_assemble: "assemble"
   lang: "bg"
   treebank: "UD_Bulgarian-BTB"
   train_name: "bg_btb-ud-train"
@@ -30,7 +32,9 @@ workflows:
     - preprocess
     - train
     - evaluate
-    - package
+    - train-ner
+    - evaluate-ner
+    - assemble_package
 
 commands:
   - name: preprocess
@@ -76,9 +80,9 @@ commands:
       - >-
         python -m spacy train 
         configs/${vars.config}.cfg
-        --output training/${vars.treebank}
+        --output training/${vars.package_name}
         --gpu-id ${vars.gpu}
-        --code ./functions.py 
+        --code ./language_components/functions.py 
         --paths.train corpus/${vars.treebank}/train.spacy 
         --paths.dev corpus/${vars.treebank}/dev.spacy 
         --nlp.lang=${vars.lang}
@@ -87,33 +91,59 @@ commands:
       - "corpus/${vars.treebank}/dev.spacy"
       - "configs/${vars.config}.cfg"
     outputs:
-      - "training/${vars.treebank}/model-best"
-      
+      - "training/${vars.package_name}/model-best"
 
   - name: evaluate
     help: "Evaluate on the test data and save the metrics"
     script:
-      - "python -m spacy evaluate ./training/${vars.treebank}/model-best ./corpus/${vars.treebank}/test.spacy --output ./metrics/${vars.treebank}.json --gpu-id ${vars.gpu}"
+      - "python -m spacy evaluate ./training/${vars.package_name}/model-best ./corpus/${vars.treebank}/test.spacy --output ./metrics/${vars.package_name}.json --gpu-id ${vars.gpu}"
     deps:
-      - "training/${vars.treebank}/model-best"
+      - "training/${vars.package_name}/model-best"
       - "corpus/${vars.treebank}/test.spacy"
     outputs:
-      - "metrics/${vars.treebank}.json"
+      - "metrics/${vars.package_name}.json"
+      
+  - name: "train-ner"
+    help: "Train the NER model without vectors"
+    script:
+      - "python -m spacy train configs/config_ner.cfg --output training/ner_sm/ --paths.train corpus/train.spacy --paths.dev corpus/dev.spacy --gpu-id ${vars.gpu}"
+    deps:
+      - "configs/config_ner.cfg"
+      - "corpus/train.spacy"
+      - "corpus/dev.spacy"
+    outputs:
+      - "training/ner_sm/model-best"
 
-  - name: package
-    help: "Package the trained model so it can be installed"
+  - name: "evaluate-ner"
+    help: "Evaluate the model and export metrics"
+    script:
+     - "python -m spacy evaluate training/ner_sm/model-best corpus/dev.spacy --output training/ner_sm/metrics.json"
+    deps:
+     - "corpus/dev.spacy"
+     - "training/ner_sm/model-best"
+    outputs:
+     - "training/ner_sm/metrics.json"
+  
+  - name: "assemble_package"
+    help: "Assemble the bg_ner and bg_tagger_parser models and package them as a spaCy pipeline"
     script:
       - >-
-        python -m spacy package 
-        training/${vars.treebank}/model-best packages
-        --build wheel 
-        --name ${vars.package_name} 
+        python -m spacy assemble configs/assemble.cfg training/${vars.package_name}/model-best
+        --paths.parser_model training/${vars.package_name}/model-best
+        --paths.ner_model training/ner_sm/model-best
+        --verbose
+      - >-
+        python -m spacy package training/${vars.package_name}/model-best packages/
+        --build wheel
+        --name ${vars.package_name}
         --version ${vars.package_version}
+        --meta-path meta.json
         --force
     deps:
-      - "training/${vars.treebank}/model-best"
-    outputs_no_cache:
-      - "packages/${vars.lang}_${vars.package_name}-${vars.package_version}/dist/${vars.package_name}-${vars.package_version}.tar.gz"
+      - training/${vars.package_name}/model-best
+      - training/ner_sm/model-best
+    outputs:
+      - packages/bg_news_sm_${vars.package_version}
 
   - name: clean
     help: "Remove intermediate files"
@@ -121,3 +151,4 @@ commands:
       - "rm -rf training/*"
       - "rm -rf metrics/*"
       - "rm -rf corpus/*"
+      - "rm -rf assets/*"

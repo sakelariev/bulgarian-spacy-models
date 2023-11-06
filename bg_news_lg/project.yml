@@ -32,7 +32,9 @@ workflows:
     - init-floret-vectors
     - train
     - evaluate
-    - package
+    - train-ner
+    - evaluate-ner
+    - assemble_package
 
 commands:
   - name: preprocess
@@ -103,20 +105,47 @@ commands:
     outputs:
       - "metrics/${vars.treebank}-floret.json"
 
-  - name: package
-    help: "Package the trained model so it can be installed"
+  - name: "train-ner"
+    help: "Train the NER model with vectors"
+    script:
+      - "python -m spacy train configs/config_ner.cfg --output training/ner_lg/ --paths.train corpus/train.spacy --paths.dev corpus/dev.spacy --gpu-id ${vars.gpu} --initialize.vectors ${vars.vectors_model} --components.tok2vec.model.embed.include_static_vectors true"
+    deps:
+      - "configs/config_ner.cfg"
+      - "corpus/train.spacy"
+      - "corpus/dev.spacy"
+    outputs:
+      - "training/ner_lg/model-best"
+  
+  - name: "evaluate-ner"
+    help: "Evaluate the model and export metrics"
+    script:
+     - "python -m spacy evaluate training/ner_lg/model-best corpus/dev.spacy --output training/ner_lg/metrics.json"
+    deps:
+     - "corpus/dev.spacy"
+     - "training/ner_lg/model-best"
+    outputs:
+     - "training/ner_lg/metrics.json"
+  
+  - name: "assemble_package"
+    help: "Assemble the bg_ner and bg_tagger_parser models and package them as a spaCy pipeline"
     script:
       - >-
-        python -m spacy package 
-        training/${vars.treebank}-floret/model-best packages
-        --build wheel 
+        python -m spacy assemble configs/assemble.cfg training/${vars.package_name}/model-best
+        --paths.parser_model training/${vars.package_name}/model-best
+        --paths.ner_model training/ner_lg/model-best
+        --verbose
+      - >-
+        python -m spacy package training/${vars.package_name}/model-best packages/
+        --build wheel
         --name ${vars.package_name}
         --version ${vars.package_version}
+        --meta-path meta.json
         --force
     deps:
-      - "training/${vars.treebank}-floret/model-best"
-    outputs_no_cache:
-      - "packages/${vars.lang}_${vars.package_name}-${vars.package_version}/dist/${vars.package_name}-${vars.package_version}.tar.gz"
+      - training/${vars.package_name}/model-best
+      - training/ner_lg/model-best
+    outputs:
+      - packages/bg_news_lg_${vars.package_version}
 
   - name: clean
     help: "Remove intermediate files"

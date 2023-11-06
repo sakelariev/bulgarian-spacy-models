@@ -1,0 +1,22 @@
+{
+  "lang":"bg",
+  "description":"Bulgarian pipeline for BGspaCy. Components: tok2vec, tagger, morphologizer, lemmatizer, parser, ner",
+  "author":"Ivaylo Sakelariev",
+  "email":"ivaylo.sakelariev@gmail.com",
+  "url":"https://github.com/sakelariev/bulgarian-spacy-models",
+  "license":"CC-BY-NC-SA-3.0",
+    "sources":[
+    {
+      "name":"UD_Bulgarian-BTB",
+      "url":"https://github.com/UniversalDependencies/UD_Bulgarian-BTB",
+      "license":"CC-BY-NC-SA-3.0",
+      "author":"Kiril Simov and Petya Osenova"
+    },
+    {
+      "name":"Large-sized Bulgarian Floret word vectors",
+      "url":"https://huggingface.co/sakelariev/bg_floret_vectors_lg",
+      "license":"MIT",
+      "author":"Ivaylo Sakelariev"
+    }
+  ]
+}

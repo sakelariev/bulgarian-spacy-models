@@ -29,6 +29,7 @@ Coming soon
 
 ### License
 **CC-BY-NC-SA-3.0**
+
 Sadly the original license of the [Bulgarian Treebank](https://github.com/UniversalDependencies/UD_Bulgarian-BTB), which was used for the training of the main pipeline components (pretty much everything without the NER) was released under this non-commercial/share-alike license, which prevents me to release that models under any other license terms (my intention was releasing this under the MIT license). So all of the models cannot be used for commercial purposes. 
 
 

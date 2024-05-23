@@ -10,9 +10,9 @@ All Bulgarian pipelines contains a tokenizer, trainable lemmatizer, POS tagger, 
 ### Installation
 You can download all the models from Huggingface:
 
-Small Bulgarian model: `pip install https://huggingface.co/sakelariev/bg_news_sm/resolve/main/bg_news_sm-3.5.4-py3-none-any.whl` <br>
-Large Bulgarian model: `pip install https://huggingface.co/sakelariev/bg_news_lg/resolve/main/bg_news_lg-3.5.4-py3-none-any.whl` <br>
-Transformer based Bulgarian model: `pip install https://huggingface.co/sakelariev/bg_news_trf/resolve/main/bg_news_trf-3.5.4-py3-none-any.whl`
+Small Bulgarian model: ```pip install https://huggingface.co/sakelariev/bg_news_sm/resolve/main/bg_news_sm-3.5.4-py3-none-any.whl``` <br>
+Large Bulgarian model: ```pip install https://huggingface.co/sakelariev/bg_news_lg/resolve/main/bg_news_lg-3.5.4-py3-none-any.whl``` <br>
+Transformer based Bulgarian model: ```pip install https://huggingface.co/sakelariev/bg_news_trf/resolve/main/bg_news_trf-3.5.4-py3-none-any.whl```
 
 ### Usage
 After installing the models via pip you can directly use by loading into spaCy:
